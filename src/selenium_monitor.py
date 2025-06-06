@@ -60,9 +60,9 @@ class SeleniumJewelryMonitor:
             print(f"📁 創建結果目錄: {self.results_dir}")
     
     def create_driver(self):
-        """創建 Chrome 瀏覽器實例 - 簡化穩定版"""
+        """創建 Chrome 瀏覽器實例 - 系統套件版"""
         try:
-            print("🚀 正在啟動 Chrome 瀏覽器...")
+            print("🚀 正在啟動 Chromium 瀏覽器...")
             
             chrome_options = Options()
             
@@ -75,45 +75,29 @@ class SeleniumJewelryMonitor:
             chrome_options.add_argument('--disable-extensions')
             chrome_options.add_argument('--disable-web-security')
             chrome_options.add_argument('--disable-features=VizDisplayCompositor')
+            chrome_options.add_argument('--disable-background-timer-throttling')
+            chrome_options.add_argument('--disable-renderer-backgrounding')
+            chrome_options.add_argument('--disable-backgrounding-occluded-windows')
             
             # 反檢測設定
             chrome_options.add_argument('--disable-blink-features=AutomationControlled')
             chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
             chrome_options.add_experimental_option('useAutomationExtension', False)
             
-            # 用戶代理
-            chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+            # 設定用戶代理
+            chrome_options.add_argument('--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+            
+            # 使用系統安裝的 Chromium
+            chrome_options.binary_location = '/usr/bin/chromium-browser'
             
             # 使用新版 Selenium 語法
             from selenium.webdriver.chrome.service import Service
             
-            # 方法1: 使用系統安裝的 ChromeDriver
-            try:
-                service = Service('/usr/local/bin/chromedriver')
-                driver = webdriver.Chrome(service=service, options=chrome_options)
-                print("✅ 使用系統 ChromeDriver 成功")
-                
-            except Exception as e1:
-                print(f"⚠️ 系統 ChromeDriver 失敗: {e1}")
-                
-                # 方法2: 使用 webdriver-manager
-                try:
-                    from webdriver_manager.chrome import ChromeDriverManager
-                    service = Service(ChromeDriverManager().install())
-                    driver = webdriver.Chrome(service=service, options=chrome_options)
-                    print("✅ 使用 webdriver-manager 成功")
-                    
-                except Exception as e2:
-                    print(f"⚠️ webdriver-manager 失敗: {e2}")
-                    
-                    # 方法3: 讓 Selenium 自動尋找
-                    try:
-                        driver = webdriver.Chrome(options=chrome_options)
-                        print("✅ 使用自動檢測成功")
-                        
-                    except Exception as e3:
-                        print(f"❌ 所有方法都失敗: {e3}")
-                        return None
+            print("📍 使用系統套件安裝的 ChromeDriver...")
+            
+            # 使用系統安裝的 ChromeDriver
+            service = Service('/usr/bin/chromedriver')
+            driver = webdriver.Chrome(service=service, options=chrome_options)
             
             # 設定超時
             driver.set_page_load_timeout(30)
@@ -121,17 +105,43 @@ class SeleniumJewelryMonitor:
             
             # 反檢測腳本
             driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            driver.execute_script("Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]})")
+            driver.execute_script("Object.defineProperty(navigator, 'languages', {get: () => ['zh-TW', 'zh', 'en']})")
             
-            # 測試瀏覽器
-            print("🧪 測試瀏覽器功能...")
-            driver.get("data:text/html,<html><body><h1>Test</h1></body></html>")
+            # 測試瀏覽器基本功能
+            print("🧪 測試瀏覽器基本功能...")
+            test_html = "data:text/html,<html><body><h1>Selenium Test</h1><p>瀏覽器測試成功</p></body></html>"
+            driver.get(test_html)
             
-            print("✅ Chrome 瀏覽器啟動並測試成功")
-            return driver
+            # 檢查頁面是否載入成功
+            if "Selenium Test" in driver.page_source:
+                print("✅ Chromium 瀏覽器啟動並測試成功")
+                return driver
+            else:
+                print("❌ 瀏覽器測試失敗")
+                driver.quit()
+                return None
             
         except Exception as e:
             print(f"❌ 創建瀏覽器失敗: {e}")
+            print("🔍 錯誤詳細資訊:")
             traceback.print_exc()
+            
+            # 嘗試診斷問題
+            print("\n🔧 診斷環境:")
+            try:
+                import os
+                print(f"Chromium 是否存在: {os.path.exists('/usr/bin/chromium-browser')}")
+                print(f"ChromeDriver 是否存在: {os.path.exists('/usr/bin/chromedriver')}")
+                
+                if os.path.exists('/usr/bin/chromium-browser'):
+                    os.system('ls -la /usr/bin/chromium-browser')
+                if os.path.exists('/usr/bin/chromedriver'):
+                    os.system('ls -la /usr/bin/chromedriver')
+                    
+            except Exception as diag_e:
+                print(f"診斷失敗: {diag_e}")
+            
             return None
     
     def simulate_human_behavior(self, driver):

@@ -21,81 +21,81 @@ jobs:
       with:
         python-version: '3.11'
     
-    - name: 安裝瀏覽器和驅動程式
+    - name: 安裝瀏覽器 (使用系統套件)
       run: |
-        echo "🔧 安裝 Chrome 和 ChromeDriver..."
+        echo "🔧 使用系統套件安裝 Chrome 和 ChromeDriver..."
         
         # 更新套件庫
         sudo apt-get update
         
-        # 安裝 Chrome
-        sudo apt-get install -y wget gnupg
-        wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-        sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
-        sudo apt-get update
-        sudo apt-get install -y google-chrome-stable
+        # 安裝 Chromium 和 ChromeDriver (更穩定)
+        sudo apt-get install -y \
+          chromium-browser \
+          chromium-chromedriver \
+          xvfb
         
-        # 檢查 Chrome 版本
-        CHROME_VERSION=$(google-chrome --version | grep -oE '[0-9]+' | head -1)
-        echo "✅ Chrome 主版本: $CHROME_VERSION"
+        # 檢查安裝結果
+        echo "✅ 安裝完成，檢查版本:"
+        chromium-browser --version || echo "Chromium 檢查失敗"
+        chromedriver --version || echo "ChromeDriver 檢查失敗"
         
-        # 使用固定版本的 ChromeDriver (更穩定)
-        echo "📥 下載 ChromeDriver..."
-        
-        # 嘗試下載最新穩定版本
-        if [ "$CHROME_VERSION" -ge "120" ]; then
-          CHROMEDRIVER_VERSION="120.0.6099.109"
-        elif [ "$CHROME_VERSION" -ge "115" ]; then
-          CHROMEDRIVER_VERSION="115.0.5790.170"
-        else
-          CHROMEDRIVER_VERSION="114.0.5735.90"
-        fi
-        
-        echo "🎯 使用 ChromeDriver 版本: $CHROMEDRIVER_VERSION"
-        
-        # 下載 ChromeDriver
-        wget -O chromedriver.zip "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip"
-        
-        # 解壓縮並安裝
-        unzip chromedriver.zip
-        sudo mv chromedriver /usr/local/bin/chromedriver
-        sudo chmod +x /usr/local/bin/chromedriver
-        
-        # 驗證安裝
-        echo "✅ 安裝完成，驗證版本:"
-        google-chrome --version
-        chromedriver --version
+        # 檢查檔案位置
+        echo "📁 檢查安裝位置:"
+        which chromium-browser
+        which chromedriver
+        ls -la /usr/bin/chromium* || echo "找不到 chromium"
+        ls -la /usr/bin/chromedriver* || echo "找不到 chromedriver"
     
     - name: 安裝 Python 套件
       run: |
         echo "📦 安裝 Python 套件..."
         pip install --upgrade pip
         pip install selenium==4.15.2
-        pip install webdriver-manager==4.0.1
         pip install requests==2.31.0
         echo "✅ Python 套件安裝完成"
+        
+        # 檢查套件版本
+        pip show selenium
     
     - name: 測試 Selenium 環境
       run: |
         echo "🧪 測試 Selenium 環境..."
-        python -c "
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
+        python3 -c "
+import sys
+print(f'Python 版本: {sys.version}')
 
 try:
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.chrome.service import Service
+    print('✅ Selenium 匯入成功')
+    
+    # 設定選項
     options = Options()
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
+    options.binary_location = '/usr/bin/chromium-browser'
     
-    service = Service('/usr/local/bin/chromedriver')
+    # 創建服務
+    service = Service('/usr/bin/chromedriver')
+    
+    # 創建 driver
     driver = webdriver.Chrome(service=service, options=options)
+    print('✅ Chrome driver 創建成功')
     
-    print('✅ Selenium 環境測試成功')
+    # 測試基本功能
+    driver.get('data:text/html,<html><body><h1>Test OK</h1></body></html>')
+    title = driver.title
+    print(f'✅ 頁面測試成功，標題: {title}')
+    
     driver.quit()
+    print('✅ Selenium 環境測試完全成功')
+    
 except Exception as e:
     print(f'❌ Selenium 環境測試失敗: {e}')
+    import traceback
+    traceback.print_exc()
     exit(1)
 "
     
@@ -107,12 +107,18 @@ except Exception as e:
       env:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        DISPLAY: :99
     
-    - name: 檢查生成的檔案
+    - name: 檢查執行結果
       if: always()
       run: |
         echo "=== 檢查監控結果 ==="
+        
+        # 檢查當前目錄
+        echo "📁 當前目錄內容:"
         ls -la
+        
+        # 檢查 results 目錄
         if [ -d results ]; then
           echo "✅ results 目錄存在"
           ls -la results/
@@ -120,30 +126,41 @@ except Exception as e:
           echo "⚠️ 沒有 results 目錄"
         fi
         
+        # 檢查匹配結果檔案
         if [ -f selenium_matches.txt ]; then
           echo "✅ 找到 selenium_matches.txt"
           echo "檔案大小: $(wc -l < selenium_matches.txt) 行"
-          echo "檔案內容預覽:"
-          head -10 selenium_matches.txt
+          echo "--- 檔案內容預覽 ---"
+          head -15 selenium_matches.txt
         else
           echo "⚠️ 沒有找到 selenium_matches.txt"
+        fi
+        
+        # 檢查 JSON 結果
+        if [ -f selenium_summary.json ]; then
+          echo "✅ 找到 selenium_summary.json"
+          cat selenium_summary.json
+        else
+          echo "⚠️ 沒有找到 selenium_summary.json"
         fi
     
     - name: 提交結果到儲存庫
       if: success()
       run: |
         git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+        git config --local user.name "GitHub Action Bot"
         
-        # 添加結果檔案
-        git add results/ || echo "沒有 results 資料夾"
-        git add *.txt || echo "沒有 txt 檔案"
-        git add *.json || echo "沒有 json 檔案"
+        # 添加所有結果檔案
+        git add results/ 2>/dev/null || echo "沒有 results 資料夾"
+        git add *.txt 2>/dev/null || echo "沒有 txt 檔案"
+        git add *.json 2>/dev/null || echo "沒有 json 檔案"
         
-        # 檢查是否有變更
+        # 檢查是否有變更需要提交
         if git diff --staged --quiet; then
-          echo "沒有新的監控結果需要提交"
+          echo "📝 沒有新的監控結果需要提交"
         else
-          git commit -m "🤖 Selenium 監控結果更新 - $(date '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "📝 發現新的監控結果，準備提交..."
+          git commit -m "🤖 Selenium 監控結果 - $(date '+%Y-%m-%d %H:%M:%S UTC')"
           git push
+          echo "✅ 結果已提交到儲存庫"
         fi
