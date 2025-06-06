@@ -1,0 +1,65 @@
+name: 金工珠寶監控
+
+on:
+  schedule:
+    # 每小時執行一次 (UTC 時間，台灣時間需要 +8 小時)
+    - cron: '0 * * * *'
+  
+  # 可以手動觸發
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 檢出程式碼
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: 設置 Python 環境
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: 安裝 Python 依賴
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: 執行監控程式
+      run: |
+        cd src
+        python monitor.py
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    
+    - name: 提交結果到儲存庫
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # 添加結果檔案
+        git add results/ || echo "沒有 results 資料夾"
+        git add *.txt || echo "沒有 txt 檔案"
+        git add *.json || echo "沒有 json 檔案"
+        
+        # 檢查是否有變更
+        if git diff --staged --quiet; then
+          echo "沒有新的監控結果需要提交"
+        else
+          git commit -m "🤖 自動更新監控結果 - $(date '+%Y-%m-%d %H:%M:%S UTC')"
+          git push
+        fi
+    
+    - name: 上傳執行日誌
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: monitoring-logs
+        path: |
+          *.log
+          results/
+        retention-days: 7
