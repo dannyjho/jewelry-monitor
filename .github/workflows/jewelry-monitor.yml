@@ -21,30 +21,64 @@ jobs:
       with:
         python-version: '3.11'
     
-    - name: 安裝系統依賴
+    - name: 安裝 Chrome 瀏覽器
       run: |
+        # 更新套件庫
         sudo apt-get update
-        sudo apt-get install -y \
-          wget \
-          unzip \
-          xvfb \
-          chromium-browser \
-          chromium-chromedriver
+        
+        # 安裝必要的依賴
+        sudo apt-get install -y wget gnupg
+        
+        # 添加 Google Chrome 的官方 GPG 密鑰
+        wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+        
+        # 添加 Google Chrome 的官方 APT 儲存庫
+        sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+        
+        # 更新套件庫並安裝 Chrome
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+        
+        # 驗證安裝
+        google-chrome --version
+        
+    - name: 安裝 ChromeDriver
+      run: |
+        # 獲取 Chrome 版本
+        CHROME_VERSION=$(google-chrome --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+        echo "Chrome 版本: $CHROME_VERSION"
+        
+        # 下載對應的 ChromeDriver
+        CHROMEDRIVER_VERSION=$(curl -sS chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION%%.*})
+        echo "ChromeDriver 版本: $CHROMEDRIVER_VERSION"
+        
+        # 下載並安裝 ChromeDriver
+        wget -N https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip
+        unzip -o chromedriver_linux64.zip
+        sudo mv chromedriver /usr/local/bin/chromedriver
+        sudo chmod +x /usr/local/bin/chromedriver
+        
+        # 驗證安裝
+        chromedriver --version
     
     - name: 安裝 Python 套件
       run: |
         pip install --upgrade pip
-        pip install selenium
-        pip install webdriver-manager
-        pip install beautifulsoup4
-        pip install lxml
-        pip install requests
+        pip install selenium==4.15.2
+        pip install webdriver-manager==4.0.1
+        pip install beautifulsoup4==4.12.2
+        pip install lxml==4.9.3
+        pip install requests==2.31.0
     
-    - name: 驗證 Chrome 安裝
+    - name: 驗證環境
       run: |
-        chromium-browser --version
-        chromedriver --version
-        which chromium-browser
+        echo "=== Python 版本 ==="
+        python --version
+        echo "=== 已安裝的套件 ==="
+        pip list | grep -E "(selenium|webdriver|beautifulsoup|requests)"
+        echo "=== Chrome 路徑 ==="
+        which google-chrome
+        echo "=== ChromeDriver 路徑 ==="
         which chromedriver
     
     - name: 執行 Selenium 監控
@@ -54,7 +88,7 @@ jobs:
       env:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        DISPLAY: :99
+        DISPLAY: :0
     
     - name: 檢查生成的檔案
       if: always()
@@ -64,7 +98,8 @@ jobs:
         ls -la results/ || echo "沒有 results 目錄"
         if [ -f selenium_matches.txt ]; then
           echo "✅ 找到 selenium_matches.txt"
-          echo "檔案大小: $(wc -l < selenium_matches.txt) 行"
+          echo "檔案內容預覽:"
+          head -20 selenium_matches.txt
         fi
     
     - name: 提交結果到儲存庫
