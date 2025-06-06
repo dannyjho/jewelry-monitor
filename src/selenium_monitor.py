@@ -60,98 +60,79 @@ class SeleniumJewelryMonitor:
             print(f"📁 創建結果目錄: {self.results_dir}")
     
     def create_driver(self):
-        def create_driver(self):
-        """創建 Chrome 瀏覽器實例 - 修正版"""
+        """創建 Chrome 瀏覽器實例 - 簡化穩定版"""
         try:
             print("🚀 正在啟動 Chrome 瀏覽器...")
             
             chrome_options = Options()
             
-            # GitHub Actions 環境設定
+            # GitHub Actions 環境必要設定
             chrome_options.add_argument('--headless')
             chrome_options.add_argument('--no-sandbox')
             chrome_options.add_argument('--disable-dev-shm-usage')
             chrome_options.add_argument('--disable-gpu')
             chrome_options.add_argument('--window-size=1920,1080')
             chrome_options.add_argument('--disable-extensions')
-            chrome_options.add_argument('--disable-plugins')
-            chrome_options.add_argument('--disable-images')  # 加快載入速度
-            chrome_options.add_argument('--disable-javascript')  # 可選：停用 JS 加快載入
+            chrome_options.add_argument('--disable-web-security')
+            chrome_options.add_argument('--disable-features=VizDisplayCompositor')
             
             # 反檢測設定
             chrome_options.add_argument('--disable-blink-features=AutomationControlled')
             chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
             chrome_options.add_experimental_option('useAutomationExtension', False)
             
-            # 模擬真實用戶
+            # 用戶代理
             chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
             
-            # 設定 Chrome 二進制位置
-            chrome_options.binary_location = '/usr/bin/chromium-browser'
-            
-            # 新版 Selenium 的正確方法
+            # 使用新版 Selenium 語法
             from selenium.webdriver.chrome.service import Service
             
-            # 創建 Chrome 服務
-            service = Service('/usr/bin/chromedriver')
+            # 方法1: 使用系統安裝的 ChromeDriver
+            try:
+                service = Service('/usr/local/bin/chromedriver')
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+                print("✅ 使用系統 ChromeDriver 成功")
+                
+            except Exception as e1:
+                print(f"⚠️ 系統 ChromeDriver 失敗: {e1}")
+                
+                # 方法2: 使用 webdriver-manager
+                try:
+                    from webdriver_manager.chrome import ChromeDriverManager
+                    service = Service(ChromeDriverManager().install())
+                    driver = webdriver.Chrome(service=service, options=chrome_options)
+                    print("✅ 使用 webdriver-manager 成功")
+                    
+                except Exception as e2:
+                    print(f"⚠️ webdriver-manager 失敗: {e2}")
+                    
+                    # 方法3: 讓 Selenium 自動尋找
+                    try:
+                        driver = webdriver.Chrome(options=chrome_options)
+                        print("✅ 使用自動檢測成功")
+                        
+                    except Exception as e3:
+                        print(f"❌ 所有方法都失敗: {e3}")
+                        return None
             
-            # 使用新的方式創建 driver
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-            
-            # 設定頁面載入超時
+            # 設定超時
             driver.set_page_load_timeout(30)
             driver.implicitly_wait(10)
             
-            # 執行反檢測腳本
+            # 反檢測腳本
             driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-            driver.execute_script("Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]})")
-            driver.execute_script("Object.defineProperty(navigator, 'languages', {get: () => ['zh-TW', 'zh', 'en']})")
             
-            print("✅ Chrome 瀏覽器啟動成功")
+            # 測試瀏覽器
+            print("🧪 測試瀏覽器功能...")
+            driver.get("data:text/html,<html><body><h1>Test</h1></body></html>")
+            
+            print("✅ Chrome 瀏覽器啟動並測試成功")
             return driver
             
         except Exception as e:
             print(f"❌ 創建瀏覽器失敗: {e}")
-            print("🔄 嘗試備用方法...")
-            
-            # 備用方法：使用 webdriver-manager
-            try:
-                from webdriver_manager.chrome import ChromeDriverManager
-                
-                chrome_options = Options()
-                chrome_options.add_argument('--headless')
-                chrome_options.add_argument('--no-sandbox')
-                chrome_options.add_argument('--disable-dev-shm-usage')
-                chrome_options.add_argument('--disable-gpu')
-                chrome_options.add_argument('--window-size=1920,1080')
-                
-                # 使用 webdriver-manager 自動管理 driver
-                service = Service(ChromeDriverManager().install())
-                driver = webdriver.Chrome(service=service, options=chrome_options)
-                
-                print("✅ 使用 webdriver-manager 創建瀏覽器成功")
-                return driver
-                
-            except Exception as e2:
-                print(f"❌ 備用方法也失敗: {e2}")
-                
-                # 最後備用方法：嘗試系統默認
-                try:
-                    chrome_options = Options()
-                    chrome_options.add_argument('--headless')
-                    chrome_options.add_argument('--no-sandbox')
-                    chrome_options.add_argument('--disable-dev-shm-usage')
-                    
-                    # 不指定路徑，讓系統自動尋找
-                    driver = webdriver.Chrome(options=chrome_options)
-                    
-                    print("✅ 使用系統默認 Chrome 成功")
-                    return driver
-                    
-                except Exception as e3:
-                    print(f"❌ 所有方法都失敗: {e3}")
-                    traceback.print_exc()
-                    return None
+            traceback.print_exc()
+            return None
     
     def simulate_human_behavior(self, driver):
         """模擬人類瀏覽行為"""
