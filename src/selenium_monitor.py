@@ -14,8 +14,8 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import traceback
 import random
 
-class SeleniumJewelryMonitor:
-    """使用 Selenium 的金工珠寶監控工具"""
+class NewAPIJewelryMonitor:
+    """使用新 API 端點的金工珠寶監控工具"""
     
     def __init__(self):
         self.keywords = self.load_keywords()
@@ -27,7 +27,26 @@ class SeleniumJewelryMonitor:
         self.telegram_token = os.environ.get('TELEGRAM_BOT_TOKEN')
         self.telegram_chat_id = os.environ.get('TELEGRAM_CHAT_ID')
         
-        print("🔧 初始化 Selenium 金工珠寶監控器")
+        # 論壇配置 - 從你提供的 URL 分析
+        self.forum_configs = {
+            'marriage': {
+                'name': '結婚版',
+                'listKey': 'f_popular_v3_f11e8d02-6756-4376-9db3-e1cca4d2a66c',
+                'immersiveKey': 'v_popular_f11e8d02-6756-4376-9db3-e1cca4d2a66c'
+            },
+            'jewelry': {
+                'name': '珠寶版',
+                'listKey': 'f_popular_v3_jewelry',  # 需要實際獲取
+                'immersiveKey': 'v_popular_jewelry'
+            },
+            'girl': {
+                'name': '女孩版',
+                'listKey': 'f_popular_v3_girl',
+                'immersiveKey': 'v_popular_girl'
+            }
+        }
+        
+        print("🔧 初始化新 API 金工珠寶監控器")
         print(f"📁 結果目錄: {self.results_dir}")
         print(f"📝 關鍵字數量: {len(self.keywords)}")
         
@@ -60,13 +79,13 @@ class SeleniumJewelryMonitor:
             print(f"📁 創建結果目錄: {self.results_dir}")
     
     def create_driver(self):
-        """創建 Chrome 瀏覽器實例 - 系統套件版"""
+        """創建 Chrome 瀏覽器實例"""
         try:
             print("🚀 正在啟動 Chromium 瀏覽器...")
             
             chrome_options = Options()
             
-            # GitHub Actions 環境必要設定
+            # GitHub Actions 環境設定
             chrome_options.add_argument('--headless')
             chrome_options.add_argument('--no-sandbox')
             chrome_options.add_argument('--disable-dev-shm-usage')
@@ -75,9 +94,6 @@ class SeleniumJewelryMonitor:
             chrome_options.add_argument('--disable-extensions')
             chrome_options.add_argument('--disable-web-security')
             chrome_options.add_argument('--disable-features=VizDisplayCompositor')
-            chrome_options.add_argument('--disable-background-timer-throttling')
-            chrome_options.add_argument('--disable-renderer-backgrounding')
-            chrome_options.add_argument('--disable-backgrounding-occluded-windows')
             
             # 反檢測設定
             chrome_options.add_argument('--disable-blink-features=AutomationControlled')
@@ -93,9 +109,6 @@ class SeleniumJewelryMonitor:
             # 使用新版 Selenium 語法
             from selenium.webdriver.chrome.service import Service
             
-            print("📍 使用系統套件安裝的 ChromeDriver...")
-            
-            # 使用系統安裝的 ChromeDriver
             service = Service('/usr/bin/chromedriver')
             driver = webdriver.Chrome(service=service, options=chrome_options)
             
@@ -108,279 +121,330 @@ class SeleniumJewelryMonitor:
             driver.execute_script("Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]})")
             driver.execute_script("Object.defineProperty(navigator, 'languages', {get: () => ['zh-TW', 'zh', 'en']})")
             
-            # 測試瀏覽器基本功能
-            print("🧪 測試瀏覽器基本功能...")
-            test_html = "data:text/html,<html><body><h1>Selenium Test</h1><p>瀏覽器測試成功</p></body></html>"
-            driver.get(test_html)
-            
-            # 檢查頁面是否載入成功
-            if "Selenium Test" in driver.page_source:
-                print("✅ Chromium 瀏覽器啟動並測試成功")
-                return driver
-            else:
-                print("❌ 瀏覽器測試失敗")
-                driver.quit()
-                return None
+            print("✅ Chromium 瀏覽器啟動成功")
+            return driver
             
         except Exception as e:
             print(f"❌ 創建瀏覽器失敗: {e}")
-            print("🔍 錯誤詳細資訊:")
             traceback.print_exc()
-            
-            # 嘗試診斷問題
-            print("\n🔧 診斷環境:")
-            try:
-                import os
-                print(f"Chromium 是否存在: {os.path.exists('/usr/bin/chromium-browser')}")
-                print(f"ChromeDriver 是否存在: {os.path.exists('/usr/bin/chromedriver')}")
-                
-                if os.path.exists('/usr/bin/chromium-browser'):
-                    os.system('ls -la /usr/bin/chromium-browser')
-                if os.path.exists('/usr/bin/chromedriver'):
-                    os.system('ls -la /usr/bin/chromedriver')
-                    
-            except Exception as diag_e:
-                print(f"診斷失敗: {diag_e}")
-            
             return None
     
-    def simulate_human_behavior(self, driver):
-        """模擬人類瀏覽行為"""
+    def extract_api_keys_from_page(self, driver, forum):
+        """從頁面中提取真實的 API 參數"""
         try:
-            # 隨機滾動
-            scroll_to = random.randint(100, 800)
-            driver.execute_script(f"window.scrollTo(0, {scroll_to});")
+            print(f"🔍 從 {forum} 版頁面提取 API 參數...")
             
-            # 隨機等待
-            wait_time = random.uniform(1, 3)
-            time.sleep(wait_time)
-            
-            # 再次滾動
-            scroll_to = random.randint(500, 1200)
-            driver.execute_script(f"window.scrollTo(0, {scroll_to});")
-            
-            time.sleep(random.uniform(0.5, 2))
-            
-        except Exception as e:
-            print(f"⚠️ 模擬人類行為時發生錯誤: {e}")
-    
-    def wait_for_page_load(self, driver, timeout=20):
-        """等待頁面完全載入"""
-        try:
-            # 等待頁面基本元素載入
-            WebDriverWait(driver, timeout).until(
-                EC.presence_of_element_located((By.TAG_NAME, "body"))
-            )
-            
-            # 等待 JavaScript 執行完成
-            WebDriverWait(driver, timeout).until(
-                lambda d: d.execute_script("return document.readyState") == "complete"
-            )
-            
-            print("✅ 頁面載入完成")
-            return True
-            
-        except TimeoutException:
-            print("⚠️ 頁面載入超時")
-            return False
-    
-    def extract_articles_from_page(self, driver, forum):
-        """從頁面中提取文章資訊"""
-        articles = []
-        
-        try:
-            print("🔍 開始提取文章資訊...")
-            
-            # 等待內容載入
-            time.sleep(3)
-            
-            # 嘗試多種文章選擇器
-            article_selectors = [
-                'article',
-                '[data-testid*="post"]',
-                '[class*="Post"]',
-                '[class*="post"]',
-                'a[href*="/p/"]',
-                '.PostEntry_container',
-                '.post-item'
-            ]
-            
-            found_elements = []
-            for selector in article_selectors:
-                try:
-                    elements = driver.find_elements(By.CSS_SELECTOR, selector)
-                    if elements:
-                        print(f"✅ 使用選擇器 '{selector}' 找到 {len(elements)} 個元素")
-                        found_elements = elements
-                        break
-                except Exception as e:
-                    continue
-            
-            if not found_elements:
-                print("⚠️ 使用標準選擇器找不到文章，嘗試通用方法...")
-                # 尋找包含連結的元素
-                found_elements = driver.find_elements(By.CSS_SELECTOR, 'a[href*="/f/' + forum + '/p/"]')
-            
-            if not found_elements:
-                print("⚠️ 仍然找不到文章元素，嘗試從頁面源碼提取...")
-                return self.extract_from_page_source(driver, forum)
-            
-            print(f"📄 找到 {len(found_elements)} 個潛在文章元素")
-            
-            # 提取文章資訊
-            processed_urls = set()
-            
-            for i, element in enumerate(found_elements[:30]):  # 限制處理數量
-                try:
-                    article_data = {}
-                    
-                    # 嘗試獲取標題
-                    title = ""
-                    title_selectors = ['h3', 'h2', '.title', '[class*="title"]', '[class*="Title"]']
-                    
-                    for title_selector in title_selectors:
-                        try:
-                            title_element = element.find_element(By.CSS_SELECTOR, title_selector)
-                            title = title_element.text.strip()
-                            if title:
-                                break
-                        except:
-                            continue
-                    
-                    # 如果在元素內找不到標題，嘗試元素本身的文字
-                    if not title:
-                        title = element.text.strip()
-                    
-                    # 獲取連結
-                    url = ""
-                    try:
-                        if element.tag_name == 'a':
-                            url = element.get_attribute("href")
-                        else:
-                            link_element = element.find_element(By.TAG_NAME, "a")
-                            url = link_element.get_attribute("href")
-                    except:
-                        pass
-                    
-                    # 驗證是否為有效的文章連結
-                    if url and f"/f/{forum}/p/" in url and url not in processed_urls:
-                        # 提取文章 ID
-                        post_id = re.search(r'/p/(\d+)', url)
-                        if post_id:
-                            article_data = {
-                                'id': post_id.group(1),
-                                'title': title,
-                                'url': url,
-                                'excerpt': title,  # 暫時用標題當摘要
-                                'forum': forum,
-                                'source': 'selenium'
-                            }
-                            articles.append(article_data)
-                            processed_urls.add(url)
-                            
-                            print(f"📝 提取文章 {len(articles)}: {title[:40]}...")
-                
-                except Exception as e:
-                    continue
-            
-            print(f"✅ 成功提取 {len(articles)} 篇文章")
-            return articles
-            
-        except Exception as e:
-            print(f"❌ 提取文章時發生錯誤: {e}")
-            traceback.print_exc()
-            return []
-    
-    def extract_from_page_source(self, driver, forum):
-        """從頁面源碼提取文章"""
-        try:
-            print("🔍 從頁面源碼提取文章...")
-            
-            page_source = driver.page_source
-            articles = []
-            
-            # 使用正則表達式尋找文章連結和標題
-            # 尋找文章連結
-            link_pattern = rf'href="(/f/{forum}/p/\d+)"'
-            links = re.findall(link_pattern, page_source)
-            
-            # 尋找可能的標題（在文章連結附近）
-            for link in links[:20]:  # 限制數量
-                try:
-                    # 構建完整 URL
-                    full_url = f"https://www.dcard.tw{link}"
-                    
-                    # 提取文章 ID
-                    post_id = re.search(r'/p/(\d+)', link)
-                    if post_id:
-                        # 嘗試在頁面源碼中找到對應的標題
-                        # 這是簡化版本，實際可能需要更複雜的解析
-                        article_data = {
-                            'id': post_id.group(1),
-                            'title': f"文章 {post_id.group(1)}",  # 暫時的標題
-                            'url': full_url,
-                            'excerpt': '',
-                            'forum': forum,
-                            'source': 'selenium_source'
-                        }
-                        articles.append(article_data)
-                        
-                except Exception as e:
-                    continue
-            
-            print(f"✅ 從源碼提取到 {len(articles)} 篇文章")
-            return articles
-            
-        except Exception as e:
-            print(f"❌ 從源碼提取失敗: {e}")
-            return []
-    
-    def get_forum_posts_selenium(self, driver, forum, forum_name):
-        """使用 Selenium 獲取論壇文章"""
-        try:
-            print(f"\n{'='*50}")
-            print(f"🌐 使用 Selenium 訪問 {forum_name}")
-            print(f"{'='*50}")
-            
-            # 構建 URL
+            # 訪問論壇頁面
             url = f"https://www.dcard.tw/f/{forum}"
-            print(f"📡 訪問 URL: {url}")
-            
-            # 訪問頁面
             driver.get(url)
             
             # 等待頁面載入
-            if not self.wait_for_page_load(driver):
-                print(f"❌ {forum_name} 頁面載入失敗")
-                return []
+            time.sleep(5)
             
-            print(f"✅ {forum_name} 頁面載入成功")
+            # 監聽網路請求來獲取真實的 API 參數
+            logs = driver.get_log('performance')
             
-            # 模擬人類瀏覽行為
-            self.simulate_human_behavior(driver)
+            api_params = {}
             
-            # 等待動態內容載入
-            print("⏳ 等待動態內容載入...")
+            for log in logs:
+                message = json.loads(log['message'])
+                if message['message']['method'] == 'Network.responseReceived':
+                    url = message['message']['params']['response']['url']
+                    
+                    # 尋找 globalPaging API 請求
+                    if 'globalPaging/page' in url:
+                        print(f"✅ 找到 API 請求: {url}")
+                        
+                        # 解析 URL 參數
+                        from urllib.parse import urlparse, parse_qs
+                        parsed = urlparse(url)
+                        params = parse_qs(parsed.query)
+                        
+                        api_params = {
+                            'listKey': params.get('listKey', [''])[0],
+                            'immersiveVideoListKey': params.get('immersiveVideoListKey', [''])[0],
+                            'pageKey': params.get('pageKey', [''])[0]
+                        }
+                        
+                        print(f"📋 提取到的參數: {api_params}")
+                        break
+            
+            return api_params
+            
+        except Exception as e:
+            print(f"❌ 提取 API 參數失敗: {e}")
+            return None
+    
+    def get_article_content(self, session, article_id, forum_url):
+        """獲取文章的完整內容"""
+        try:
+            print(f"📄 獲取文章 {article_id} 的完整內容...")
+            
+            # 文章詳情 API
+            article_api_url = f"https://www.dcard.tw/service/api/v2/posts/{article_id}"
+            
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Referer': forum_url,
+                'Origin': 'https://www.dcard.tw',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin',
+            }
+            
+            response = session.get(article_api_url, headers=headers, timeout=15)
+            
+            if response.status_code == 200:
+                try:
+                    article_data = response.json()
+                    content = article_data.get('content', '')
+                    title = article_data.get('title', '')
+                    excerpt = article_data.get('excerpt', '')
+                    
+                    print(f"✅ 成功獲取文章內容 (長度: {len(content)} 字元)")
+                    
+                    return {
+                        'id': article_id,
+                        'title': title,
+                        'content': content,
+                        'excerpt': excerpt,
+                        'full_text': f"{title} {content}",  # 用於關鍵字搜尋
+                        'likeCount': article_data.get('likeCount', 0),
+                        'commentCount': article_data.get('commentCount', 0),
+                        'createdAt': article_data.get('createdAt', ''),
+                        'school': article_data.get('school', ''),
+                        'department': article_data.get('department', '')
+                    }
+                    
+                except json.JSONDecodeError as e:
+                    print(f"❌ 文章內容 JSON 解析失敗: {e}")
+                    return None
+            else:
+                print(f"⚠️ 獲取文章內容失敗: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ 獲取文章內容時發生錯誤: {e}")
+            return None
+    
+    def get_posts_via_new_api(self, driver, forum, forum_name):
+        """使用新的 API 端點獲取文章"""
+        try:
+            print(f"\n{'='*50}")
+            print(f"🌐 使用新 API 獲取 {forum_name} 文章")
+            print(f"{'='*50}")
+            
+            # 先訪問論壇頁面建立 session
+            print("🏠 先訪問論壇頁面...")
+            forum_url = f"https://www.dcard.tw/f/{forum}"
+            driver.get(forum_url)
+            
+            # 等待頁面載入
             time.sleep(random.uniform(3, 6))
             
-            # 滾動載入更多內容
-            print("📜 滾動載入更多內容...")
+            # 滾動頁面觸發 API 請求
+            print("📜 滾動頁面觸發 API...")
             for i in range(3):
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 time.sleep(random.uniform(2, 4))
             
-            # 提取文章
-            articles = self.extract_articles_from_page(driver, forum)
+            # 獲取 cookies 用於 API 請求
+            cookies = driver.get_cookies()
+            session_cookies = {}
+            for cookie in cookies:
+                session_cookies[cookie['name']] = cookie['value']
             
-            if articles:
-                print(f"🎉 {forum_name} 成功獲取 {len(articles)} 篇文章")
+            # 構建 API 請求
+            if forum in self.forum_configs:
+                config = self.forum_configs[forum]
+                listKey = config['listKey']
+                immersiveKey = config['immersiveKey']
             else:
-                print(f"⚠️ {forum_name} 沒有獲取到文章")
+                print(f"⚠️ 未找到 {forum} 的配置，使用通用配置")
+                listKey = f"f_popular_v3_{forum}"
+                immersiveKey = f"v_popular_{forum}"
             
-            return articles
+            # API 端點
+            api_url = "https://www.dcard.tw/service/api/v2/globalPaging/page"
+            
+            # API 參數
+            params = {
+                'enrich': 'true',
+                'forumLogo': 'true',
+                'pinnedPosts': 'widget',
+                'country': 'TW',
+                'platform': 'web',
+                'listKey': listKey,
+                'immersiveVideoListKey': immersiveKey,
+                'pageKey': f"{forum}_page_{int(time.time())}",  # 生成唯一的 pageKey
+                'offset': '0'
+            }
+            
+            # 設定 headers
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Referer': forum_url,
+                'Origin': 'https://www.dcard.tw',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin',
+            }
+            
+            print(f"📡 請求 API: {api_url}")
+            print(f"📋 參數: {params}")
+            
+            # 發送 API 請求
+            session = requests.Session()
+            session.cookies.update(session_cookies)
+            
+            response = session.get(api_url, params=params, headers=headers, timeout=30)
+            
+            print(f"📊 API 回應狀態: {response.status_code}")
+            
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    
+                    # 解析回應中的文章 ID
+                    basic_posts = self.parse_api_response(data, forum)
+                    print(f"✅ 找到 {len(basic_posts)} 篇文章，開始獲取完整內容...")
+                    
+                    # 獲取每篇文章的完整內容
+                    detailed_posts = []
+                    for i, post in enumerate(basic_posts[:15], 1):  # 限制處理數量避免過載
+                        print(f"📖 處理第 {i} 篇文章 (ID: {post['id']})...")
+                        
+                        article_detail = self.get_article_content(session, post['id'], forum_url)
+                        
+                        if article_detail:
+                            # 合併基本資訊和詳細內容
+                            detailed_post = {
+                                **post,  # 基本資訊
+                                **article_detail,  # 詳細內容
+                                'url': f"https://www.dcard.tw/f/{forum}/p/{post['id']}"
+                            }
+                            detailed_posts.append(detailed_post)
+                        else:
+                            # 如果無法獲取詳細內容，使用基本資訊
+                            detailed_posts.append(post)
+                        
+                        # 避免請求過快
+                        time.sleep(random.uniform(0.5, 1.5))
+                    
+                    print(f"✅ 成功獲取 {len(detailed_posts)} 篇文章的詳細內容")
+                    return detailed_posts
+                    
+                except json.JSONDecodeError as e:
+                    print(f"❌ JSON 解析失敗: {e}")
+                    print(f"回應內容: {response.text[:200]}...")
+                    return []
+            else:
+                print(f"❌ API 請求失敗: {response.status_code}")
+                print(f"回應內容: {response.text[:200]}...")
+                return []
+                
+        except Exception as e:
+            print(f"❌ 新 API 請求失敗: {e}")
+            traceback.print_exc()
+            return []
+    
+    def parse_api_response(self, data, forum):
+        """解析 API 回應中的文章"""
+        posts = []
+        
+        try:
+            print("🔍 分析新版 API 回應結構...")
+            
+            # 方法 1: 直接尋找 posts 或類似的陣列
+            post_arrays = []
+            
+            def find_post_arrays(obj, path=""):
+                if isinstance(obj, dict):
+                    for key, value in obj.items():
+                        if isinstance(value, list) and len(value) > 0:
+                            # 檢查是否為文章陣列
+                            first_item = value[0]
+                            if isinstance(first_item, dict) and 'id' in first_item:
+                                print(f"✅ 找到文章陣列於: {path}.{key} (包含 {len(value)} 個項目)")
+                                post_arrays.append(value)
+                        elif isinstance(value, (dict, list)):
+                            find_post_arrays(value, f"{path}.{key}" if path else key)
+                elif isinstance(obj, list):
+                    for i, item in enumerate(obj):
+                        if isinstance(item, (dict, list)):
+                            find_post_arrays(item, f"{path}[{i}]")
+            
+            find_post_arrays(data)
+            
+            # 方法 2: 如果找不到明顯的文章陣列，遞歸搜尋所有 ID
+            if not post_arrays:
+                print("🔍 未找到明顯的文章陣列，搜尋所有文章 ID...")
+                
+                def find_article_ids(obj, collected_ids=None):
+                    if collected_ids is None:
+                        collected_ids = []
+                    
+                    if isinstance(obj, dict):
+                        # 尋找文章 ID（通常是數字且在合理範圍內）
+                        if 'id' in obj:
+                            article_id = obj['id']
+                            if isinstance(article_id, (int, str)) and str(article_id).isdigit():
+                                id_num = int(article_id)
+                                if 100000000 <= id_num <= 999999999:  # Dcard 文章 ID 範圍
+                                    collected_ids.append({
+                                        'id': str(article_id),
+                                        'title': obj.get('title', f'文章 {article_id}'),
+                                        'excerpt': obj.get('excerpt', ''),
+                                        'url': f"https://www.dcard.tw/f/{forum}/p/{article_id}",
+                                        'forum': forum,
+                                        'source': 'new_api_id_search'
+                                    })
+                                    print(f"📝 找到文章 ID: {article_id}")
+                        
+                        for value in obj.values():
+                            find_article_ids(value, collected_ids)
+                            
+                    elif isinstance(obj, list):
+                        for item in obj:
+                            find_article_ids(item, collected_ids)
+                    
+                    return collected_ids
+                
+                posts = find_article_ids(data)
+            else:
+                # 處理找到的文章陣列
+                for post_array in post_arrays:
+                    for post_item in post_array:
+                        if isinstance(post_item, dict) and 'id' in post_item:
+                            posts.append({
+                                'id': str(post_item.get('id', '')),
+                                'title': post_item.get('title', f"文章 {post_item.get('id', '')}"),
+                                'excerpt': post_item.get('excerpt', ''),
+                                'url': f"https://www.dcard.tw/f/{forum}/p/{post_item.get('id', '')}",
+                                'forum': forum,
+                                'source': 'new_api_array'
+                            })
+                            print(f"📝 處理文章: {post_item.get('title', '')[:40]}...")
+            
+            # 去重（基於 ID）
+            seen_ids = set()
+            unique_posts = []
+            for post in posts:
+                if post['id'] not in seen_ids:
+                    seen_ids.add(post['id'])
+                    unique_posts.append(post)
+            
+            print(f"✅ 解析完成，找到 {len(unique_posts)} 篇唯一文章")
+            return unique_posts
             
         except Exception as e:
-            print(f"❌ 獲取 {forum_name} 文章失敗: {e}")
+            print(f"❌ 解析 API 回應失敗: {e}")
             traceback.print_exc()
             return []
     
@@ -411,14 +475,19 @@ class SeleniumJewelryMonitor:
             'url': post.get('url', ''),
             'matched_keywords': keywords,
             'excerpt': post.get('excerpt', '')[:200],
-            'source': 'selenium',
+            'content_preview': post.get('content', '')[:300],  # 前300字內容預覽
+            'like_count': post.get('likeCount', 0),
+            'comment_count': post.get('commentCount', 0),
+            'author': f"{post.get('school', '')} {post.get('department', '')}".strip(),
+            'created_at': post.get('createdAt', ''),
+            'source': 'new_api_with_content',
             'found_at': taiwan_time.strftime('%Y-%m-%d %H:%M:%S'),
             'found_at_utc': now.strftime('%Y-%m-%d %H:%M:%S UTC')
         }
         
         # 保存到 JSON 檔案
         today = taiwan_time.strftime('%Y-%m-%d')
-        json_file = os.path.join(self.results_dir, f"selenium_matches_{today}.json")
+        json_file = os.path.join(self.results_dir, f"new_api_matches_{today}.json")
         
         matches = []
         if os.path.exists(json_file):
@@ -434,7 +503,7 @@ class SeleniumJewelryMonitor:
             json.dump(matches, f, ensure_ascii=False, indent=2)
         
         # 保存到總結果檔案
-        summary_file = os.path.join(self.base_dir, "selenium_matches.txt")
+        summary_file = os.path.join(self.base_dir, "new_api_matches.txt")
         with open(summary_file, 'a', encoding='utf-8') as f:
             f.write(f"\n{'='*60}\n")
             f.write(f"發現時間: {match_data['found_at']} (台灣時間)\n")
@@ -442,7 +511,7 @@ class SeleniumJewelryMonitor:
             f.write(f"標題: {match_data['title']}\n")
             f.write(f"網址: {match_data['url']}\n")
             f.write(f"匹配關鍵字: {', '.join(keywords)}\n")
-            f.write(f"來源: Selenium 瀏覽器\n")
+            f.write(f"來源: 新版 API\n")
         
         print(f"✅ 保存匹配: {post.get('title', '')[:50]}...")
         return match_data
@@ -458,7 +527,7 @@ class SeleniumJewelryMonitor:
         
         try:
             taiwan_time = datetime.now().strftime('%Y-%m-%d %H:%M')
-            message = f"🎯 Selenium 金工珠寶監控報告 ({taiwan_time})\n"
+            message = f"🎯 新版 API 金工珠寶監控報告 ({taiwan_time})\n"
             message += f"發現 {len(matches)} 篇相關文章！\n\n"
             
             for i, match in enumerate(matches[:3], 1):  # 最多顯示 3 篇
@@ -466,7 +535,7 @@ class SeleniumJewelryMonitor:
                 message += f"   📍 {match['forum_name']}\n"
                 message += f"   🔗 {match['url']}\n"
                 message += f"   🏷️ {', '.join(match['matched_keywords'][:3])}\n"
-                message += f"   🤖 來源: Selenium\n\n"
+                message += f"   🆕 來源: 新版 API\n\n"
             
             if len(matches) > 3:
                 message += f"... 還有 {len(matches) - 3} 篇文章\n"
@@ -489,10 +558,10 @@ class SeleniumJewelryMonitor:
         except Exception as e:
             print(f"❌ Telegram 通知錯誤: {e}")
     
-    def run_selenium_monitoring(self):
-        """執行 Selenium 監控任務"""
+    def run_new_api_monitoring(self):
+        """執行新版 API 監控任務"""
         start_time = datetime.now()
-        print("🚀 開始 Selenium 金工珠寶監控任務")
+        print("🚀 開始新版 API 金工珠寶監控任務")
         print(f"⏰ 開始時間: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"🎯 監控關鍵字: {len(self.keywords)} 個")
         
@@ -505,8 +574,8 @@ class SeleniumJewelryMonitor:
                 return
             
             forums = {
+                'marriage': '結婚版',
                 'jewelry': '珠寶版',
-                'marriage': '結婚版', 
                 'girl': '女孩版'
             }
             
@@ -515,8 +584,8 @@ class SeleniumJewelryMonitor:
             
             for forum_key, forum_name in forums.items():
                 try:
-                    # 使用 Selenium 獲取文章
-                    posts = self.get_forum_posts_selenium(driver, forum_key, forum_name)
+                    # 使用新版 API 獲取文章
+                    posts = self.get_posts_via_new_api(driver, forum_key, forum_name)
                     
                     if posts:
                         successful_forums += 1
@@ -524,20 +593,26 @@ class SeleniumJewelryMonitor:
                         
                         for post in posts:
                             title = post.get('title', '')
+                            content = post.get('content', '')
                             excerpt = post.get('excerpt', '')
-                            text = f"{title} {excerpt}"
                             
-                            matched_keywords = self.check_keywords(text)
+                            # 使用完整內容進行關鍵字匹配
+                            full_text = f"{title} {content} {excerpt}"
+                            matched_keywords = self.check_keywords(full_text)
                             
                             if matched_keywords:
                                 match_data = self.save_match(post, forum_key, forum_name, matched_keywords)
                                 matches.append(match_data)
+                                print(f"🎯 匹配文章: {title[:40]}... (關鍵字: {', '.join(matched_keywords[:3])})")
                         
                         all_matches.extend(matches)
                         print(f"✅ {forum_name} 完成，發現 {len(matches)} 篇匹配")
+                    else:
+                        print(f"❌ {forum_name} 無法獲取文章")
                     
                 except Exception as e:
                     print(f"❌ 處理 {forum_name} 時發生錯誤: {e}")
+                    traceback.print_exc()
                 
                 # 論壇間等待
                 if forum_key != list(forums.keys())[-1]:
@@ -548,14 +623,14 @@ class SeleniumJewelryMonitor:
             # 生成摘要報告
             summary = {
                 'execution_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'method': 'selenium',
+                'method': 'new_api',
                 'successful_forums': successful_forums,
                 'total_forums': len(forums),
                 'total_matches': len(all_matches),
                 'matches': all_matches
             }
             
-            summary_file = os.path.join(self.base_dir, "selenium_summary.json")
+            summary_file = os.path.join(self.base_dir, "new_api_summary.json")
             with open(summary_file, 'w', encoding='utf-8') as f:
                 json.dump(summary, f, ensure_ascii=False, indent=2)
             
@@ -567,7 +642,7 @@ class SeleniumJewelryMonitor:
             end_time = datetime.now()
             duration = (end_time - start_time).seconds
             
-            print(f"\n🎉 Selenium 監控任務完成!")
+            print(f"\n🎉 新版 API 監控任務完成!")
             print(f"⏱️ 執行時間: {duration} 秒")
             print(f"📊 成功論壇: {successful_forums}/{len(forums)}")
             print(f"🎯 總計發現: {len(all_matches)} 篇匹配文章")
@@ -595,8 +670,8 @@ class SeleniumJewelryMonitor:
 
 def main():
     try:
-        monitor = SeleniumJewelryMonitor()
-        monitor.run_selenium_monitoring()
+        monitor = NewAPIJewelryMonitor()
+        monitor.run_new_api_monitoring()
     except Exception as e:
         print(f"❌ 程式執行失敗: {e}")
         traceback.print_exc()
