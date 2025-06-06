@@ -1,0 +1,46 @@
+name: 金工珠寶監控-新版
+
+on:
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 檢出程式碼
+      uses: actions/checkout@v4
+    
+    - name: 調試檔案系統
+      run: |
+        echo "=== 當前目錄 ==="
+        pwd
+        echo "=== 列出所有檔案 ==="
+        find . -type f -name "*.txt" -o -name "*.py" -o -name "*.yml"
+        echo "=== 檢查 requirements.txt ==="
+        if [ -f requirements.txt ]; then
+          echo "✅ 找到 requirements.txt"
+          cat requirements.txt
+        else
+          echo "❌ 找不到 requirements.txt"
+          echo "目錄內容："
+          ls -la
+        fi
+    
+    - name: 設置 Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: 直接安裝套件
+      run: |
+        pip install requests cloudscraper python-dateutil
+    
+    - name: 測試執行
+      run: |
+        cd src
+        python -c "print('✅ Python 環境正常')"
+        python monitor.py
+      env:
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
