@@ -1,46 +1,87 @@
-name: 金工珠寶監控-新版
+name: 金工珠寶監控-Selenium版
 
 on:
+  schedule:
+    # 每小時執行一次
+    - cron: '0 * * * *'
+  
+  # 可以手動觸發
   workflow_dispatch:
 
 jobs:
-  monitor:
+  selenium-monitor:
     runs-on: ubuntu-latest
     
     steps:
     - name: 檢出程式碼
       uses: actions/checkout@v4
     
-    - name: 調試檔案系統
-      run: |
-        echo "=== 當前目錄 ==="
-        pwd
-        echo "=== 列出所有檔案 ==="
-        find . -type f -name "*.txt" -o -name "*.py" -o -name "*.yml"
-        echo "=== 檢查 requirements.txt ==="
-        if [ -f requirements.txt ]; then
-          echo "✅ 找到 requirements.txt"
-          cat requirements.txt
-        else
-          echo "❌ 找不到 requirements.txt"
-          echo "目錄內容："
-          ls -la
-        fi
-    
-    - name: 設置 Python
+    - name: 設置 Python 環境
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
     
-    - name: 直接安裝套件
+    - name: 安裝系統依賴
       run: |
-        pip install requests cloudscraper python-dateutil
+        sudo apt-get update
+        sudo apt-get install -y \
+          wget \
+          unzip \
+          xvfb \
+          chromium-browser \
+          chromium-chromedriver
     
-    - name: 測試執行
+    - name: 安裝 Python 套件
+      run: |
+        pip install --upgrade pip
+        pip install selenium
+        pip install webdriver-manager
+        pip install beautifulsoup4
+        pip install lxml
+        pip install requests
+    
+    - name: 驗證 Chrome 安裝
+      run: |
+        chromium-browser --version
+        chromedriver --version
+        which chromium-browser
+        which chromedriver
+    
+    - name: 執行 Selenium 監控
       run: |
         cd src
-        python -c "print('✅ Python 環境正常')"
-        python monitor.py
+        python selenium_monitor.py
       env:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        DISPLAY: :99
+    
+    - name: 檢查生成的檔案
+      if: always()
+      run: |
+        echo "=== 檢查監控結果 ==="
+        ls -la
+        ls -la results/ || echo "沒有 results 目錄"
+        if [ -f selenium_matches.txt ]; then
+          echo "✅ 找到 selenium_matches.txt"
+          echo "檔案大小: $(wc -l < selenium_matches.txt) 行"
+        fi
+    
+    - name: 提交結果到儲存庫
+      if: success()
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # 添加結果檔案
+        git add results/ || echo "沒有 results 資料夾"
+        git add *.txt || echo "沒有 txt 檔案"
+        git add *.json || echo "沒有 json 檔案"
+        
+        # 檢查是否有變更
+        if git diff --staged --quiet; then
+          echo "沒有新的監控結果需要提交"
+        else
+          git commit -m "🤖 Selenium 監控結果更新 - $(date '+%Y-%m-%d %H:%M:%S UTC')"
+          git push
+        fi
