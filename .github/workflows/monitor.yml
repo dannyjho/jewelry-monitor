@@ -20,7 +20,7 @@ jobs:
         echo "📁 根目錄檔案:"
         ls -la
         echo "📝 尋找 requirements.txt:"
-        find . -name "requirements.txt" -type f
+        find . -regex '.*requirements.txt$'
         echo "📄 requirements.txt 內容:"
         cat ./requirements.txt 2>/dev/null || echo "❌ 無法讀取 requirements.txt"
     
