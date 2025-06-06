@@ -1,11 +1,8 @@
-name: 金工珠寶監控
+name: 金工珠寶監控-修復版
 
 on:
   schedule:
-    # 每小時執行一次 (UTC 時間，台灣時間需要 +8 小時)
     - cron: '0 * * * *'
-  
-  # 可以手動觸發
   workflow_dispatch:
 
 jobs:
@@ -15,47 +12,30 @@ jobs:
     steps:
     - name: 檢出程式碼
       uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
     
-    - name: 檢查檔案結構
+    - name: 強制檢查所有檔案
       run: |
-        echo "=== 當前目錄 ==="
+        echo "🔍 當前工作目錄:"
         pwd
-        echo "=== 檔案列表 ==="
+        echo "📁 根目錄檔案:"
         ls -la
-        echo "=== 檢查 requirements.txt ==="
-        if [ -f requirements.txt ]; then
-          echo "✅ requirements.txt 存在"
-          cat requirements.txt
-        else
-          echo "❌ requirements.txt 不存在"
-        fi
-        echo "=== 檢查 src/ 目錄 ==="
-        if [ -d src ]; then
-          echo "✅ src/ 目錄存在"
-          ls -la src/
-        else
-          echo "❌ src/ 目錄不存在"
-        fi
+        echo "📝 尋找 requirements.txt:"
+        find . -name "requirements.txt" -type f
+        echo "📄 requirements.txt 內容:"
+        cat ./requirements.txt 2>/dev/null || echo "❌ 無法讀取 requirements.txt"
     
     - name: 設置 Python 環境
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
     
-    - name: 安裝 Python 依賴
+    - name: 手動安裝套件
       run: |
-        python -m pip install --upgrade pip
-        # 確保在正確的目錄
-        pwd
-        ls -la requirements.txt
-        pip install -r requirements.txt
-    
-    - name: 檢查 Python 程式語法
-      run: |
-        cd src
-        python -c "import monitor; print('✅ Python 語法檢查通過')"
+        echo "📦 直接安裝套件，不依賴 requirements.txt"
+        pip install requests==2.31.0
+        pip install cloudscraper==1.2.71
+        pip install python-dateutil==2.8.2
+        echo "✅ 套件安裝完成"
     
     - name: 執行監控程式
       run: |
@@ -65,39 +45,7 @@ jobs:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     
-    - name: 檢查生成的檔案
-      run: |
-        echo "=== 檢查生成的檔案 ==="
-        pwd
-        ls -la
-        if [ -d results ]; then
-          echo "✅ results/ 目錄存在"
-          ls -la results/
-        else
-          echo "⚠️ results/ 目錄不存在"
-        fi
-        if [ -f latest_matches.txt ]; then
-          echo "✅ latest_matches.txt 存在"
-          echo "檔案大小: $(wc -l < latest_matches.txt) 行"
-        else
-          echo "⚠️ latest_matches.txt 不存在"
-        fi
-        
-    - name: 提交結果到儲存庫
+    - name: 提交結果
       if: success()
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        
-        # 添加結果檔案
-        git add results/ || echo "沒有 results 資料夾"
-        git add *.txt || echo "沒有 txt 檔案"
-        git add *.json || echo "沒有 json 檔案"
-        
-        # 檢查是否有變更
-        if git diff --staged --quiet; then
-          echo "沒有新的監控結果需要提交"
-        else
-          git commit -m "🤖 自動更新監控結果 - $(date '+%Y-%m-%d %H:%M:%S UTC')"
-          git push
-        fi
+        git config --l
