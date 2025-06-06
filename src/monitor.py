@@ -5,10 +5,34 @@ from datetime import datetime, timezone
 import cloudscraper
 import time
 import traceback
+import random
 
 class JewelryMonitor:
     def __init__(self):
-        self.scraper = cloudscraper.create_scraper()
+        # 使用 cloudscraper 來繞過 Cloudflare
+        self.scraper = cloudscraper.create_scraper(
+            browser={
+                'browser': 'chrome',
+                'platform': 'windows',
+                'mobile': False
+            }
+        )
+        
+        # 設置更真實的 headers
+        self.scraper.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"'
+        })
+        
         self.keywords = self.load_keywords()
         self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.results_dir = os.path.join(self.base_dir, "results")
@@ -68,24 +92,67 @@ class JewelryMonitor:
         with open(processed_file, 'a', encoding='utf-8') as f:
             f.write(f"{post_id}\n")
     
-    def get_dcard_posts(self, forum, limit=50):
-        """獲取 Dcard 文章"""
-        try:
-            url = f"https://www.dcard.tw/service/api/v2/forums/{forum}/posts"
-            params = {'limit': limit, 'popular': False}
+    def get_dcard_posts(self, forum, limit=30):
+        """獲取 Dcard 文章 - 增強版反爬蟲"""
+        max_retries = 3
+        
+        for attempt in range(max_retries):
+            try:
+                print(f"🔄 嘗試第 {attempt + 1} 次獲取 {forum} 版文章...")
+                
+                # 隨機延遲避免被檢測
+                delay = random.uniform(2, 5)
+                print(f"⏳ 等待 {delay:.1f} 秒...")
+                time.sleep(delay)
+                
+                # 構建 URL
+                url = f"https://www.dcard.tw/service/api/v2/forums/{forum}/posts"
+                params = {
+                    'limit': limit,
+                    'popular': 'false'  # 使用字串而不是 Boolean
+                }
+                
+                # 更新 Referer 讓請求更真實
+                self.scraper.headers.update({
+                    'Referer': f'https://www.dcard.tw/f/{forum}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                })
+                
+                print(f"📡 正在請求: {url}")
+                response = self.scraper.get(
+                    url, 
+                    params=params, 
+                    timeout=30,
+                    allow_redirects=True
+                )
+                
+                print(f"📊 回應狀態碼: {response.status_code}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    print(f"✅ 成功獲取 {len(data)} 篇文章")
+                    return data
+                elif response.status_code == 403:
+                    print(f"🚫 403 錯誤，等待更長時間後重試...")
+                    time.sleep(10 + attempt * 5)
+                else:
+                    print(f"⚠️ 未預期的狀態碼: {response.status_code}")
+                    
+            except requests.exceptions.RequestException as e:
+                print(f"🌐 網路錯誤: {e}")
+            except json.JSONDecodeError as e:
+                print(f"📄 JSON 解析錯誤: {e}")
+            except Exception as e:
+                print(f"❌ 未知錯誤: {e}")
+                traceback.print_exc()
             
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-            
-            response = self.scraper.get(url, params=params, headers=headers, timeout=30)
-            response.raise_for_status()
-            
-            return response.json()
-            
-        except Exception as e:
-            print(f"❌ 獲取 {forum} 版文章失敗: {e}")
-            return []
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 10
+                print(f"⏳ 等待 {wait_time} 秒後重試...")
+                time.sleep(wait_time)
+        
+        print(f"❌ 獲取 {forum} 版文章失敗，已重試 {max_retries} 次")
+        return []
     
     def check_keywords(self, text):
         """檢查關鍵字匹配"""
@@ -204,11 +271,16 @@ class JewelryMonitor:
         print(f"\n📱 正在檢查 Dcard {forum_name}...")
         
         try:
-            posts = self.get_dcard_posts(forum, limit=50)
+            posts = self.get_dcard_posts(forum, limit=30)  # 減少請求量
+            
+            if not posts:
+                print(f"⚠️ {forum_name} 沒有獲取到文章，跳過處理")
+                return []
+                
             processed_posts = self.get_processed_posts()
             matches = []
             
-            print(f"📄 獲取到 {len(posts)} 篇文章")
+            print(f"📄 獲取到 {len(posts)} 篇文章，開始處理...")
             
             for post in posts:
                 post_id = f"dcard_{forum}_{post['id']}"
@@ -291,7 +363,12 @@ class JewelryMonitor:
             try:
                 matches = self.monitor_forum(forum_key, forum_name)
                 all_matches.extend(matches)
-                time.sleep(2)  # 論壇間間隔
+                
+                # 論壇間較長的間隔
+                wait_time = random.uniform(5, 10)
+                print(f"⏳ 等待 {wait_time:.1f} 秒後檢查下一個論壇...")
+                time.sleep(wait_time)
+                
             except Exception as e:
                 print(f"❌ 處理 {forum_name} 時發生錯誤: {e}")
         
