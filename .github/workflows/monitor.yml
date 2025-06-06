@@ -60,6 +60,6 @@ jobs:
       with:
         name: monitoring-logs
         path: |
-          *.log
           results/
         retention-days: 7
+        if-no-files-found: ignore
