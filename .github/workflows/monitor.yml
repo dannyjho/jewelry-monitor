@@ -18,31 +18,44 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
     
+    - name: 檢查檔案結構
+      run: |
+        echo "=== 當前目錄 ==="
+        pwd
+        echo "=== 檔案列表 ==="
+        ls -la
+        echo "=== 檢查 requirements.txt ==="
+        if [ -f requirements.txt ]; then
+          echo "✅ requirements.txt 存在"
+          cat requirements.txt
+        else
+          echo "❌ requirements.txt 不存在"
+        fi
+        echo "=== 檢查 src/ 目錄 ==="
+        if [ -d src ]; then
+          echo "✅ src/ 目錄存在"
+          ls -la src/
+        else
+          echo "❌ src/ 目錄不存在"
+        fi
+    
     - name: 設置 Python 環境
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
     
-    - name: 檢查檔案結構
-      run: |
-        echo "=== 檢查檔案結構 ==="
-        pwd
-        ls -la
-        echo "=== 檢查 src 資料夾 ==="
-        ls -la src/ || echo "❌ src 資料夾不存在"
-        echo "=== 檢查 requirements.txt ==="
-        cat requirements.txt || echo "❌ requirements.txt 不存在"
-    
     - name: 安裝 Python 依賴
       run: |
         python -m pip install --upgrade pip
+        # 確保在正確的目錄
+        pwd
+        ls -la requirements.txt
         pip install -r requirements.txt
     
     - name: 檢查 Python 程式語法
       run: |
         cd src
-        python -m py_compile monitor.py
-        echo "✅ Python 語法檢查通過"
+        python -c "import monitor; print('✅ Python 語法檢查通過')"
     
     - name: 執行監控程式
       run: |
@@ -55,13 +68,20 @@ jobs:
     - name: 檢查生成的檔案
       run: |
         echo "=== 檢查生成的檔案 ==="
+        pwd
         ls -la
-        echo "=== 檢查 results 資料夾 ==="
-        ls -la results/ || echo "沒有 results 資料夾"
-        echo "=== 檢查 txt 檔案 ==="
-        ls -la *.txt || echo "沒有 txt 檔案"
-        echo "=== 檢查 json 檔案 ==="
-        ls -la *.json || echo "沒有 json 檔案"
+        if [ -d results ]; then
+          echo "✅ results/ 目錄存在"
+          ls -la results/
+        else
+          echo "⚠️ results/ 目錄不存在"
+        fi
+        if [ -f latest_matches.txt ]; then
+          echo "✅ latest_matches.txt 存在"
+          echo "檔案大小: $(wc -l < latest_matches.txt) 行"
+        else
+          echo "⚠️ latest_matches.txt 不存在"
+        fi
         
     - name: 提交結果到儲存庫
       if: success()
