@@ -23,10 +23,26 @@ jobs:
       with:
         python-version: '3.11'
     
+    - name: 檢查檔案結構
+      run: |
+        echo "=== 檢查檔案結構 ==="
+        pwd
+        ls -la
+        echo "=== 檢查 src 資料夾 ==="
+        ls -la src/ || echo "❌ src 資料夾不存在"
+        echo "=== 檢查 requirements.txt ==="
+        cat requirements.txt || echo "❌ requirements.txt 不存在"
+    
     - name: 安裝 Python 依賴
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+    
+    - name: 檢查 Python 程式語法
+      run: |
+        cd src
+        python -m py_compile monitor.py
+        echo "✅ Python 語法檢查通過"
     
     - name: 執行監控程式
       run: |
@@ -36,7 +52,19 @@ jobs:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     
+    - name: 檢查生成的檔案
+      run: |
+        echo "=== 檢查生成的檔案 ==="
+        ls -la
+        echo "=== 檢查 results 資料夾 ==="
+        ls -la results/ || echo "沒有 results 資料夾"
+        echo "=== 檢查 txt 檔案 ==="
+        ls -la *.txt || echo "沒有 txt 檔案"
+        echo "=== 檢查 json 檔案 ==="
+        ls -la *.json || echo "沒有 json 檔案"
+        
     - name: 提交結果到儲存庫
+      if: success()
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
@@ -53,13 +81,3 @@ jobs:
           git commit -m "🤖 自動更新監控結果 - $(date '+%Y-%m-%d %H:%M:%S UTC')"
           git push
         fi
-    
-    - name: 上傳執行日誌
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: monitoring-logs
-        path: |
-          results/
-        retention-days: 7
-        if-no-files-found: ignore
