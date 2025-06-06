@@ -21,14 +21,14 @@ jobs:
       with:
         python-version: '3.11'
     
-    - name: 安裝瀏覽器 (使用系統套件)
+    - name: 安裝瀏覽器
       run: |
         echo "🔧 使用系統套件安裝 Chrome 和 ChromeDriver..."
         
         # 更新套件庫
         sudo apt-get update
         
-        # 安裝 Chromium 和 ChromeDriver (更穩定)
+        # 安裝 Chromium 和 ChromeDriver
         sudo apt-get install -y \
           chromium-browser \
           chromium-chromedriver \
@@ -43,8 +43,6 @@ jobs:
         echo "📁 檢查安裝位置:"
         which chromium-browser
         which chromedriver
-        ls -la /usr/bin/chromium* || echo "找不到 chromium"
-        ls -la /usr/bin/chromedriver* || echo "找不到 chromedriver"
     
     - name: 安裝 Python 套件
       run: |
@@ -53,51 +51,47 @@ jobs:
         pip install selenium==4.15.2
         pip install requests==2.31.0
         echo "✅ Python 套件安裝完成"
-        
-        # 檢查套件版本
-        pip show selenium
     
     - name: 測試 Selenium 環境
       run: |
         echo "🧪 測試 Selenium 環境..."
-        python3 -c "
-import sys
-print(f'Python 版本: {sys.version}')
+        python3 << 'EOF'
+        import sys
+        print(f'Python 版本: {sys.version}')
 
-try:
-    from selenium import webdriver
-    from selenium.webdriver.chrome.options import Options
-    from selenium.webdriver.chrome.service import Service
-    print('✅ Selenium 匯入成功')
-    
-    # 設定選項
-    options = Options()
-    options.add_argument('--headless')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    options.binary_location = '/usr/bin/chromium-browser'
-    
-    # 創建服務
-    service = Service('/usr/bin/chromedriver')
-    
-    # 創建 driver
-    driver = webdriver.Chrome(service=service, options=options)
-    print('✅ Chrome driver 創建成功')
-    
-    # 測試基本功能
-    driver.get('data:text/html,<html><body><h1>Test OK</h1></body></html>')
-    title = driver.title
-    print(f'✅ 頁面測試成功，標題: {title}')
-    
-    driver.quit()
-    print('✅ Selenium 環境測試完全成功')
-    
-except Exception as e:
-    print(f'❌ Selenium 環境測試失敗: {e}')
-    import traceback
-    traceback.print_exc()
-    exit(1)
-"
+        try:
+            from selenium import webdriver
+            from selenium.webdriver.chrome.options import Options
+            from selenium.webdriver.chrome.service import Service
+            print('✅ Selenium 匯入成功')
+            
+            # 設定選項
+            options = Options()
+            options.add_argument('--headless')
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+            options.binary_location = '/usr/bin/chromium-browser'
+            
+            # 創建服務
+            service = Service('/usr/bin/chromedriver')
+            
+            # 創建 driver
+            driver = webdriver.Chrome(service=service, options=options)
+            print('✅ Chrome driver 創建成功')
+            
+            # 測試基本功能
+            driver.get('data:text/html,<html><body><h1>Test OK</h1></body></html>')
+            print('✅ 頁面測試成功')
+            
+            driver.quit()
+            print('✅ Selenium 環境測試完全成功')
+            
+        except Exception as e:
+            print(f'❌ Selenium 環境測試失敗: {e}')
+            import traceback
+            traceback.print_exc()
+            exit(1)
+        EOF
     
     - name: 執行 Selenium 監控
       run: |
@@ -107,7 +101,6 @@ except Exception as e:
       env:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        DISPLAY: :99
     
     - name: 檢查執行結果
       if: always()
